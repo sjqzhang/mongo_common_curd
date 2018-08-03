@@ -1,6 +1,7 @@
 package org.common.service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,9 +23,9 @@ import com.github.vincentrussell.query.mongodb.sql.converter.ParseException;
 import com.github.vincentrussell.query.mongodb.sql.converter.QueryConverter;
 import com.github.vincentrussell.query.mongodb.sql.converter.QueryResultIterator;
 import com.mongodb.BasicDBObject;
-import com.mongodb.Cursor;
-import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
+import com.mongodb.MongoCredential;
+import com.mongodb.ServerAddress;
 import com.mongodb.client.ListCollectionsIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
@@ -54,8 +55,8 @@ public class ApiController {
 	String port = "27017";
 
 	String limit = "1000";
-	
-	String tablePrefix="";
+
+	String tablePrefix = "";
 
 	Long LIMIT = 1000L;
 
@@ -67,7 +68,7 @@ public class ApiController {
 		password = env.getProperty("password");
 		limit = env.getProperty("limit");
 		tablePrefix = env.getProperty("table.prefix");
-		if(tablePrefix==null || tablePrefix==""){
+		if (tablePrefix == null || tablePrefix == "") {
 			tablePrefix = env.getProperty("tablePrefix");
 		}
 
@@ -83,7 +84,13 @@ public class ApiController {
 			} catch (Exception e) {
 
 			}
-			mongoClient = new MongoClient(host, p);
+			if(username!=null && password!=null) {
+				mongoClient = new MongoClient(new ServerAddress( host , p),	Arrays.asList(MongoCredential.createCredential(username,authdb,password.toCharArray())));
+			} else {
+				mongoClient = new MongoClient(host + ":" + port);
+			}
+			
+			
 
 		}
 
@@ -132,19 +139,18 @@ public class ApiController {
 		}
 		return obj;
 	}
-	
-	
-	boolean checkTablePrefix(String tablename){
-		
-		boolean flag=false;
-		
-		String[] prefixs=tablePrefix.split(",");
-		if (prefixs.length==0){
+
+	boolean checkTablePrefix(String tablename) {
+
+		boolean flag = false;
+
+		String[] prefixs = tablePrefix.split(",");
+		if (prefixs.length == 0) {
 			return true;
 		}
-		for(String prefix: prefixs) {
-			if(tablename.toLowerCase().startsWith(prefix)){
-				flag=true;
+		for (String prefix : prefixs) {
+			if (tablename.toLowerCase().startsWith(prefix)) {
+				flag = true;
 				break;
 			}
 		}
@@ -155,8 +161,8 @@ public class ApiController {
 	@ResponseBody
 	String addobjs(String table, String key, String data, HttpServletResponse resp) throws ParseException {
 		try {
-			if (!checkTablePrefix(table)){
-				return new Response("tablename prefix is invalid,must be in "+ tablePrefix).toJson();
+			if (!checkTablePrefix(table)) {
+				return new Response("tablename prefix is invalid,must be in " + tablePrefix).toJson();
 			}
 			init();
 			setHeader(resp);
@@ -184,6 +190,9 @@ public class ApiController {
 			}
 
 			MongoDatabase db = mongoClient.getDatabase(this.db);
+		
+		
+			
 			MongoCollection<Document> collection = db.getCollection(table);
 
 			if (message != "") {
