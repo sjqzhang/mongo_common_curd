@@ -6,10 +6,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -37,7 +40,9 @@ import com.mongodb.util.JSON;
 @EnableAutoConfiguration
 public class ApiController {
 
-	private MongoClient mongoClient = null;
+	private final Logger logger = LoggerFactory.getLogger(ApiController.class);
+
+	private MongoClient mongoClient = new MongoClient("10.1.50.90",27017);;
 
 	@Autowired
 	private Environment env;
@@ -46,7 +51,7 @@ public class ApiController {
 
 	String db = "test";
 
-	String username = "";
+	String username = "10.1.50.90";
 
 	String password = "";
 
@@ -56,18 +61,20 @@ public class ApiController {
 
 	String limit = "1000";
 
-	String tablePrefix = "";
+	String tablePrefix = "it_,sys_,dba_,bu_,sec_";
 
 	Long LIMIT = 1000L;
 
 	void init() {
 
-		host = env.getProperty("host");
-		db = env.getProperty("db");
-		username = env.getProperty("username");
-		password = env.getProperty("password");
-		limit = env.getProperty("limit");
-		tablePrefix = env.getProperty("table.prefix");
+		if (false) {
+			host = env.getProperty("host");
+			db = env.getProperty("db");
+			username = env.getProperty("username");
+			password = env.getProperty("password");
+			limit = env.getProperty("limit");
+			tablePrefix = env.getProperty("table.prefix");
+		}
 		if (tablePrefix == null || tablePrefix == "") {
 			tablePrefix = env.getProperty("tablePrefix");
 		}
@@ -84,13 +91,12 @@ public class ApiController {
 			} catch (Exception e) {
 
 			}
-			if(username!=null && password!=null) {
-				mongoClient = new MongoClient(new ServerAddress( host , p),	Arrays.asList(MongoCredential.createCredential(username,authdb,password.toCharArray())));
+			if (username != null && password != null) {
+				mongoClient = new MongoClient(new ServerAddress(host, p),
+						Arrays.asList(MongoCredential.createCredential(username, authdb, password.toCharArray())));
 			} else {
 				mongoClient = new MongoClient(host + ":" + port);
 			}
-			
-			
 
 		}
 
@@ -157,9 +163,16 @@ public class ApiController {
 		return flag;
 	}
 
+	String getClientIp(HttpServletRequest req) {
+
+		return req.getRemoteAddr();
+	}
+
 	@RequestMapping("/cli/addobjs")
 	@ResponseBody
-	String addobjs(String table, String key, String data, HttpServletResponse resp) throws ParseException {
+	String addobjs(String table, String key, String data, HttpServletRequest req, HttpServletResponse resp)
+			throws ParseException {
+		logger.info(String.format("ip:%s, table:%s key:%s data:%s", getClientIp(req), table, key, data));
 		try {
 			if (!checkTablePrefix(table)) {
 				return new Response("tablename prefix is invalid,must be in " + tablePrefix).toJson();
@@ -169,17 +182,13 @@ public class ApiController {
 			String message = "";
 			Object obj = null;
 			boolean isList = false;
-			try {
-
-				obj = JSON.parse(data);
-
-				if (List.class.isInstance(obj)) {
-					isList = true;
+			obj = getJSON(data);
+			if (obj == null) {
+				return new Response("data must be json", "fail").toJson();
+			} else{
+				if(List.class.isInstance(obj)){
+					isList=true;
 				}
-
-			} catch (Exception e) {
-				message = e.getMessage();
-				return new Response(message).toJson();
 			}
 
 			if (table == null) {
@@ -190,9 +199,7 @@ public class ApiController {
 			}
 
 			MongoDatabase db = mongoClient.getDatabase(this.db);
-		
-		
-			
+
 			MongoCollection<Document> collection = db.getCollection(table);
 
 			if (message != "") {
@@ -210,7 +217,7 @@ public class ApiController {
 				UpdateResult result = collection.updateOne(new BasicDBObject("_id", new ObjectId(key)),
 						new Document("$set", document));
 				if (result.getModifiedCount() > 0) {
-					return new Response("ok").toJson();
+					return new Response("ok", "ok").toJson();
 				} else {
 					return new Response("fail", "fail").toJson();
 				}
@@ -264,8 +271,8 @@ public class ApiController {
 
 	@RequestMapping("/cli/getobjs")
 	@ResponseBody
-	String getobjs(String sql, String query, HttpServletResponse resp) throws ParseException {
-
+	String getobjs(String sql, String query, HttpServletRequest req, HttpServletResponse resp) throws ParseException {
+		logger.info(String.format("ip:%s, sql:%s query:%s", getClientIp(req), sql, query));
 		try {
 			init();
 			setHeader(resp);
@@ -329,8 +336,9 @@ public class ApiController {
 
 	@RequestMapping("/cli/getobjnames")
 	@ResponseBody
-	String getobjsname(HttpServletResponse resp) throws ParseException {
+	String getobjsname(HttpServletRequest req, HttpServletResponse resp) throws ParseException {
 		try {
+
 			init();
 			setHeader(resp);
 			MongoDatabase db = mongoClient.getDatabase(this.db);
