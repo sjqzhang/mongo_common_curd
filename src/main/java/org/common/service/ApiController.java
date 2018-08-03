@@ -54,6 +54,8 @@ public class ApiController {
 	String port = "27017";
 
 	String limit = "1000";
+	
+	String tablePrefix="";
 
 	Long LIMIT = 1000L;
 
@@ -64,6 +66,10 @@ public class ApiController {
 		username = env.getProperty("username");
 		password = env.getProperty("password");
 		limit = env.getProperty("limit");
+		tablePrefix = env.getProperty("table.prefix");
+		if(tablePrefix==null || tablePrefix==""){
+			tablePrefix = env.getProperty("tablePrefix");
+		}
 
 		if (mongoClient == null) {
 			int p = 27017;
@@ -126,11 +132,32 @@ public class ApiController {
 		}
 		return obj;
 	}
+	
+	
+	boolean checkTablePrefix(String tablename){
+		
+		boolean flag=false;
+		
+		String[] prefixs=tablePrefix.split(",");
+		if (prefixs.length==0){
+			return true;
+		}
+		for(String prefix: prefixs) {
+			if(tablename.toLowerCase().startsWith(prefix)){
+				flag=true;
+				break;
+			}
+		}
+		return flag;
+	}
 
 	@RequestMapping("/cli/addobjs")
 	@ResponseBody
 	String addobjs(String table, String key, String data, HttpServletResponse resp) throws ParseException {
 		try {
+			if (!checkTablePrefix(table)){
+				return new Response("tablename prefix is invalid,must be in "+ tablePrefix).toJson();
+			}
 			init();
 			setHeader(resp);
 			String message = "";
