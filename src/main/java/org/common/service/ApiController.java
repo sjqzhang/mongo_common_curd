@@ -70,7 +70,7 @@ public class ApiController {
 	boolean debug = false;
 
 	void init() {
-		
+
 		host = env.getProperty("mongo.host") == null ? host : env.getProperty("mongo.host");
 		port = env.getProperty("mongo.port") == null ? port : env.getProperty("mongo.port");
 		authdb = env.getProperty("mongo.authdb") == null ? authdb : env.getProperty("mongo.authdb");
@@ -79,11 +79,10 @@ public class ApiController {
 		password = env.getProperty("mongo.password") == null ? password : env.getProperty("mongo.password");
 		limit = env.getProperty("limit") == null ? limit : env.getProperty("limit");
 		tablePrefix = env.getProperty("table.prefix") == null ? tablePrefix : env.getProperty("table.prefix");
- 
-//        System.out.println(host+ port+ authdb+db+username+password+limit);		
+
+		// System.out.println(host+ port+ authdb+db+username+password+limit);
 
 		if (mongoClient == null) {
-
 
 			int p = 27017;
 			try {
@@ -131,7 +130,7 @@ public class ApiController {
 			this.message = message;
 			this.status = status;
 		}
-		
+
 		public Response(Object data, String message, String status) {
 			this.data = data;
 			this.message = message;
@@ -183,7 +182,7 @@ public class ApiController {
 	@ResponseBody
 	String addobjs(String table, String key, String data, HttpServletRequest req, HttpServletResponse resp)
 			throws ParseException {
-		
+
 		logger.info(String.format("ip:%s, table:%s key:%s data:%s", getClientIp(req), table, key, data));
 		try {
 			if (!checkTablePrefix(table)) {
@@ -222,14 +221,22 @@ public class ApiController {
 
 				ObjectId id = new ObjectId(key);
 				Document document = new Document();
-				Map<String, Object> o = (Map<String, Object>) obj;
-				for (String k : o.keySet()) {
-					document.put(k, o.get(k));
+				if (isList) {
+					
+					throw new Exception("Array not support");
+
+				} else {
+					Map<String, Object> o = (Map<String, Object>) obj;
+					for (String k : o.keySet()) {
+						document.put(k, o.get(k));
+					}
 				}
 				UpdateResult result = collection.updateOne(new BasicDBObject("_id", new ObjectId(key)),
 						new Document("$set", document));
 				if (result.getModifiedCount() > 0) {
 					return new Response("ok", "ok").toJson();
+				} else if (result.getMatchedCount() > 0 && result.getModifiedCount() == 0) {
+					return new Response("matched but not update", "ok").toJson();
 				} else {
 					return new Response("fail", "fail").toJson();
 				}
@@ -251,7 +258,11 @@ public class ApiController {
 
 					}
 					collection.insertMany(documents);
-					if(documents.size()>0&&((Document)documents.get(0)).getObjectId("_id")!=null) {
+					if (documents.size() > 0 && ((Document) documents.get(0)).getObjectId("_id") != null) {
+						for (int i = 0; i < documents.size(); i++) {
+							Document doc = (Document) documents.get(i);
+							doc.put("_id", doc.getObjectId("_id").toString());
+						}
 						return new Response(documents, "ok", "ok").toJson();
 					} else {
 						return new Response("fail", "fail").toJson();
@@ -265,20 +276,19 @@ public class ApiController {
 					}
 
 					collection.insertOne(document);
-					
-					if(document.getObjectId("_id")!=null){
-						return new Response(document, "ok","ok").toJson();	
+
+					if (document.getObjectId("_id") != null) {
+						document.put("_id", document.getObjectId("_id").toString());
+						return new Response(document, "ok", "ok").toJson();
 					} else {
 						return new Response("fail", "fail").toJson();
 					}
-				
-					
 
 				}
 
 			}
 		} catch (Exception e) {
-			return new Response("Exception"+e.getMessage(), "fail").toJson();
+			return new Response("Exception " + e.getMessage(), "fail").toJson();
 		}
 
 	}
@@ -326,7 +336,9 @@ public class ApiController {
 			if (QueryResultIterator.class.isInstance(result)) {
 				QueryResultIterator<Document> iterator = (QueryResultIterator) result;
 				while (iterator.hasNext()) {
-					documents.add(iterator.next());
+					Document doc = iterator.next();
+					doc.put("_id", doc.getObjectId("_id").toString());
+					documents.add(doc);
 				}
 			}
 
