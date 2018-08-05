@@ -42,7 +42,9 @@ public class ApiController {
 
 	private final Logger logger = LoggerFactory.getLogger(ApiController.class);
 
-	private MongoClient mongoClient = new MongoClient("10.1.50.90",27017);;
+	// private MongoClient mongoClient = new MongoClient("10.1.50.90",27017);;
+
+	private MongoClient mongoClient = null;
 
 	@Autowired
 	private Environment env;
@@ -51,7 +53,7 @@ public class ApiController {
 
 	String db = "test";
 
-	String username = "10.1.50.90";
+	String username = "";
 
 	String password = "";
 
@@ -61,25 +63,28 @@ public class ApiController {
 
 	String limit = "1000";
 
-	String tablePrefix = "it_,sys_,dba_,bu_,sec_";
+	String tablePrefix = "it_,sys_,dba_,bu_,sec_,dev_";
 
 	Long LIMIT = 1000L;
 
-	void init() {
+	boolean debug = false;
 
-		if (false) {
-			host = env.getProperty("host");
-			db = env.getProperty("db");
-			username = env.getProperty("username");
-			password = env.getProperty("password");
-			limit = env.getProperty("limit");
-			tablePrefix = env.getProperty("table.prefix");
-		}
-		if (tablePrefix == null || tablePrefix == "") {
-			tablePrefix = env.getProperty("tablePrefix");
-		}
+	void init() {
+		
+		host = env.getProperty("mongo.host") == null ? host : env.getProperty("mongo.host");
+		port = env.getProperty("mongo.port") == null ? port : env.getProperty("mongo.port");
+		authdb = env.getProperty("mongo.authdb") == null ? authdb : env.getProperty("mongo.authdb");
+		db = env.getProperty("mongo.db") == null ? db : env.getProperty("mongo.db");
+		username = env.getProperty("mongo.username") == null ? username : env.getProperty("mongo.username");
+		password = env.getProperty("mongo.password") == null ? password : env.getProperty("mongo.password");
+		limit = env.getProperty("limit") == null ? limit : env.getProperty("limit");
+		tablePrefix = env.getProperty("table.prefix") == null ? tablePrefix : env.getProperty("table.prefix");
+ 
+//        System.out.println(host+ port+ authdb+db+username+password+limit);		
 
 		if (mongoClient == null) {
+
+
 			int p = 27017;
 			try {
 				p = Integer.parseInt(port);
@@ -91,7 +96,7 @@ public class ApiController {
 			} catch (Exception e) {
 
 			}
-			if (username != null && password != null) {
+			if (username != "" && password != "") {
 				mongoClient = new MongoClient(new ServerAddress(host, p),
 						Arrays.asList(MongoCredential.createCredential(username, authdb, password.toCharArray())));
 			} else {
@@ -123,6 +128,12 @@ public class ApiController {
 		}
 
 		public Response(String message, String status) {
+			this.message = message;
+			this.status = status;
+		}
+		
+		public Response(Object data, String message, String status) {
+			this.data = data;
 			this.message = message;
 			this.status = status;
 		}
@@ -172,10 +183,11 @@ public class ApiController {
 	@ResponseBody
 	String addobjs(String table, String key, String data, HttpServletRequest req, HttpServletResponse resp)
 			throws ParseException {
+		
 		logger.info(String.format("ip:%s, table:%s key:%s data:%s", getClientIp(req), table, key, data));
 		try {
 			if (!checkTablePrefix(table)) {
-				return new Response("tablename prefix is invalid,must be in " + tablePrefix).toJson();
+				return new Response("table name prefix is invalid,must be in " + tablePrefix).toJson();
 			}
 			init();
 			setHeader(resp);
@@ -185,9 +197,9 @@ public class ApiController {
 			obj = getJSON(data);
 			if (obj == null) {
 				return new Response("data must be json", "fail").toJson();
-			} else{
-				if(List.class.isInstance(obj)){
-					isList=true;
+			} else {
+				if (List.class.isInstance(obj)) {
+					isList = true;
 				}
 			}
 
@@ -239,7 +251,11 @@ public class ApiController {
 
 					}
 					collection.insertMany(documents);
-					return new Response("ok").toJson();
+					if(documents.size()>0&&((Document)documents.get(0)).getObjectId("_id")!=null) {
+						return new Response(documents, "ok", "ok").toJson();
+					} else {
+						return new Response("fail", "fail").toJson();
+					}
 
 				} else {
 					Document document = new Document();
@@ -247,24 +263,22 @@ public class ApiController {
 					for (String k : o.keySet()) {
 						document.put(k, o.get(k));
 					}
-					// String sql = "select * from "+ table.toLowerCase()+
-					// "limit 1";
-					// QueryConverter queryConverter = new QueryConverter(sql);
-					// queryConverter.getMongoQuery().setCountAll(true);
-					// queryConverter.getMongoQuery().setQuery(document);
-					// Object count = queryConverter.run(db);
-					// if(count!=null && Long.parseLong(count.toString())>0){
-					// collection.updateOne(document, document);
-					// }
 
 					collection.insertOne(document);
-					return new Response("ok").toJson();
+					
+					if(document.getObjectId("_id")!=null){
+						return new Response(document, "ok","ok").toJson();	
+					} else {
+						return new Response("fail", "fail").toJson();
+					}
+				
+					
 
 				}
 
 			}
 		} catch (Exception e) {
-			return new Response(e.getMessage()).toJson();
+			return new Response("Exception"+e.getMessage(), "fail").toJson();
 		}
 
 	}
@@ -331,10 +345,10 @@ public class ApiController {
 
 	void setHeader(HttpServletResponse resp) {
 		// resp.addHeader("Access-Control-Allow-Origin", "*");
-		resp.setHeader("Content-Type", "application/json;charset=UTF-8");
+		resp.addHeader("Content-Type", "application/json;charset=UTF-8");
 	}
 
-	@RequestMapping("/cli/getobjnames")
+	@RequestMapping(value = "/cli/getobjnames", produces = "application/json;charset=UTF-8")
 	@ResponseBody
 	String getobjsname(HttpServletRequest req, HttpServletResponse resp) throws ParseException {
 		try {
