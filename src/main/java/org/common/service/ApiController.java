@@ -29,9 +29,11 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.ListCollectionsIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.result.UpdateResult;
 import com.mongodb.util.JSON;
 
@@ -71,18 +73,16 @@ public class ApiController {
 
 	void init() {
 
-		host = env.getProperty("mongo.host") == null ? host : env.getProperty("mongo.host");
-		port = env.getProperty("mongo.port") == null ? port : env.getProperty("mongo.port");
-		authdb = env.getProperty("mongo.authdb") == null ? authdb : env.getProperty("mongo.authdb");
-		db = env.getProperty("mongo.db") == null ? db : env.getProperty("mongo.db");
-		username = env.getProperty("mongo.username") == null ? username : env.getProperty("mongo.username");
-		password = env.getProperty("mongo.password") == null ? password : env.getProperty("mongo.password");
-		limit = env.getProperty("limit") == null ? limit : env.getProperty("limit");
-		tablePrefix = env.getProperty("table.prefix") == null ? tablePrefix : env.getProperty("table.prefix");
-
-		// System.out.println(host+ port+ authdb+db+username+password+limit);
-
 		if (mongoClient == null) {
+
+			host = env.getProperty("mongo.host") == null ? host : env.getProperty("mongo.host");
+			port = env.getProperty("mongo.port") == null ? port : env.getProperty("mongo.port");
+			authdb = env.getProperty("mongo.authdb") == null ? authdb : env.getProperty("mongo.authdb");
+			db = env.getProperty("mongo.db") == null ? db : env.getProperty("mongo.db");
+			username = env.getProperty("mongo.username") == null ? username : env.getProperty("mongo.username");
+			password = env.getProperty("mongo.password") == null ? password : env.getProperty("mongo.password");
+			limit = env.getProperty("limit") == null ? limit : env.getProperty("limit");
+			tablePrefix = env.getProperty("table.prefix") == null ? tablePrefix : env.getProperty("table.prefix");
 
 			int p = 27017;
 			try {
@@ -180,10 +180,11 @@ public class ApiController {
 
 	@RequestMapping("/cli/addobjs")
 	@ResponseBody
-	String addobjs(String table, String key, String data, HttpServletRequest req, HttpServletResponse resp)
-			throws ParseException {
+	String addobjs(String table, String key, String data, String is_merge, HttpServletRequest req,
+			HttpServletResponse resp) throws ParseException {
 
-		logger.info(String.format("ip:%s, table:%s key:%s data:%s", getClientIp(req), table, key, data));
+		logger.info(String.format("ip:%s, table:%s key:%s data:%s is_merge:%s", getClientIp(req), table, key, data,
+				is_merge));
 		try {
 			if (!checkTablePrefix(table)) {
 				return new Response("table name prefix is invalid,must be in " + tablePrefix).toJson();
@@ -191,6 +192,9 @@ public class ApiController {
 			init();
 			setHeader(resp);
 			String message = "";
+			if (is_merge == null || is_merge == "") {
+				is_merge = "1";
+			}
 			Object obj = null;
 			boolean isList = false;
 			obj = getJSON(data);
@@ -199,6 +203,11 @@ public class ApiController {
 			} else {
 				if (List.class.isInstance(obj)) {
 					isList = true;
+				} else {
+					Map<String, Object> o = (Map<String, Object>) (obj);
+					if (o.containsKey("_id")) {
+						return new Response("_id is internal key,not support", "fail").toJson();
+					}
 				}
 			}
 
@@ -219,20 +228,36 @@ public class ApiController {
 
 			if (key != null && key != "") {
 
+				Document filter = new Document();
+
 				ObjectId id = new ObjectId(key);
+
+				Document doc = collection.find(Filters.eq("_id", id)).first();
+
+				if (doc == null) {
+					return new Response(String.format("_id '%s' no found", key), "fail").toJson();
+				}
+
 				Document document = new Document();
 				if (isList) {
-					
+
 					throw new Exception("Array not support");
 
 				} else {
+
+					if (is_merge == "1") {
+						for (String k : doc.keySet()) {
+							document.put(k, doc.get(k));
+						}
+					}
+
 					Map<String, Object> o = (Map<String, Object>) obj;
+					o.put("_id", id);
 					for (String k : o.keySet()) {
 						document.put(k, o.get(k));
 					}
 				}
-				UpdateResult result = collection.updateOne(new BasicDBObject("_id", new ObjectId(key)),
-						new Document("$set", document));
+				UpdateResult result = collection.updateOne(Filters.eq("_id", id), new Document("$set", document));
 				if (result.getModifiedCount() > 0) {
 					return new Response("ok", "ok").toJson();
 				} else if (result.getMatchedCount() > 0 && result.getModifiedCount() == 0) {
