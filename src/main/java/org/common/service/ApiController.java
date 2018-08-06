@@ -206,8 +206,17 @@ public class ApiController {
 		logger.info(String.format("ip:%s, table:%s key:%s data:%s is_merge:%s", getClientIp(req), table, key, data,
 				is_merge));
 		try {
+			
+			if(table==null||table==""){
+				return new Response("parameter table is null","fail").toJson();
+			}
+			
+			if(data==null||data==""){
+				return new Response("parameter data is null","fail").toJson();
+			}
+			
 			if (!checkTablePrefix(table)) {
-				return new Response("table name prefix is invalid,must be in " + tablePrefix).toJson();
+				return new Response("table name prefix is invalid,must be in " + tablePrefix,"fail").toJson();
 			}
 			init();
 			setHeader(resp);
