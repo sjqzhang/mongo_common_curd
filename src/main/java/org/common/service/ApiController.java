@@ -171,9 +171,31 @@ public class ApiController {
 		return flag;
 	}
 
-	String getClientIp(HttpServletRequest req) {
+	// String getClientIp(HttpServletRequest req) {
+	//
+	// return req.getRemoteAddr();
+	// }
 
-		return req.getRemoteAddr();
+	public static String getClientIp(HttpServletRequest request) {
+
+		String ip = request.getHeader("X-real-ip");
+
+		if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+			ip =  request.getHeader("x-forwarded-for");
+		}
+
+		if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+			ip = request.getHeader("Proxy-Client-IP");
+		}
+		if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+			ip = request.getHeader("WL-Proxy-Client-IP");
+		}
+		if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+			ip = request.getRemoteAddr();
+		}
+
+		return ip;
+
 	}
 
 	@RequestMapping("/cli/addobjs")
@@ -227,8 +249,6 @@ public class ApiController {
 
 			if (key != null && key != "") {
 
-			
-
 				ObjectId id = new ObjectId(key);
 
 				Document doc = collection.find(Filters.eq("_id", id)).first();
@@ -243,12 +263,12 @@ public class ApiController {
 					throw new Exception("Array not support");
 
 				} else {
-					
+
 					if (is_merge == "1") {
 						for (String k : doc.keySet()) {
 							document.put(k, doc.get(k));
 						}
-					} 
+					}
 					@SuppressWarnings("unchecked")
 					Map<String, Object> o = (Map<String, Object>) obj;
 					o.put("_id", id);
