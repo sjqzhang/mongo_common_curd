@@ -25,11 +25,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import com.github.vincentrussell.query.mongodb.sql.converter.ParseException;
 import com.github.vincentrussell.query.mongodb.sql.converter.QueryConverter;
 import com.github.vincentrussell.query.mongodb.sql.converter.QueryResultIterator;
-import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
-import com.mongodb.client.FindIterable;
 import com.mongodb.client.ListCollectionsIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
@@ -204,6 +202,7 @@ public class ApiController {
 				if (List.class.isInstance(obj)) {
 					isList = true;
 				} else {
+					@SuppressWarnings("unchecked")
 					Map<String, Object> o = (Map<String, Object>) (obj);
 					if (o.containsKey("_id")) {
 						return new Response("_id is internal key,not support", "fail").toJson();
@@ -228,7 +227,7 @@ public class ApiController {
 
 			if (key != null && key != "") {
 
-				Document filter = new Document();
+			
 
 				ObjectId id = new ObjectId(key);
 
@@ -244,13 +243,13 @@ public class ApiController {
 					throw new Exception("Array not support");
 
 				} else {
-
+					
 					if (is_merge == "1") {
 						for (String k : doc.keySet()) {
 							document.put(k, doc.get(k));
 						}
-					}
-
+					} 
+					@SuppressWarnings("unchecked")
 					Map<String, Object> o = (Map<String, Object>) obj;
 					o.put("_id", id);
 					for (String k : o.keySet()) {
@@ -270,8 +269,9 @@ public class ApiController {
 
 				if (isList) {
 
-					List list = (List) obj;
-					List documents = new ArrayList<Document>();
+					@SuppressWarnings("unchecked")
+					List<Map<String, Object>> list = (List<Map<String, Object>>) obj;
+					List<Document> documents = new ArrayList<Document>();
 
 					for (int i = 0; i < list.size(); i++) {
 						Map<String, Object> o = (Map<String, Object>) list.get(i);
@@ -295,6 +295,7 @@ public class ApiController {
 
 				} else {
 					Document document = new Document();
+					@SuppressWarnings("unchecked")
 					Map<String, Object> o = (Map<String, Object>) obj;
 					for (String k : o.keySet()) {
 						document.put(k, o.get(k));
@@ -333,8 +334,6 @@ public class ApiController {
 			}
 			sql = sql.toLowerCase();
 			QueryConverter queryConverter = new QueryConverter(sql);
-			String collectionName = queryConverter.getMongoQuery().getCollection();
-
 			long limit = queryConverter.getMongoQuery().getLimit();
 			if (limit < 0) {
 				queryConverter.getMongoQuery().setLimit(LIMIT);
@@ -344,6 +343,7 @@ public class ApiController {
 
 				Document doc = new Document();
 				if (query.startsWith("{") && query.endsWith("}")) {
+					@SuppressWarnings("unchecked")
 					Map<String, Object> o = (Map<String, Object>) JSON.parse(query);
 					for (String k : o.keySet()) {
 						if (k.equals("_id")) {
@@ -357,8 +357,9 @@ public class ApiController {
 				queryConverter.getMongoQuery().setQuery(doc);
 			}
 			Object result = queryConverter.run(db);
-			ArrayList documents = new ArrayList();
+			ArrayList<Document> documents = new ArrayList<Document>();
 			if (QueryResultIterator.class.isInstance(result)) {
+				@SuppressWarnings({ "unchecked", "rawtypes", "resource" })
 				QueryResultIterator<Document> iterator = (QueryResultIterator) result;
 				while (iterator.hasNext()) {
 					Document doc = iterator.next();
