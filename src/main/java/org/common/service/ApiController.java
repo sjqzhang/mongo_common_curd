@@ -63,7 +63,7 @@ public class ApiController {
 
 	String limit = "1000";
 
-	String tablePrefix = "it_,sys_,dba_,bu_,sec_,dev_";
+	String tablePrefix = "it_,sys_,dba_,bu_,sec_,dev_,test";
 
 	Long LIMIT = 1000L;
 
@@ -347,6 +347,16 @@ public class ApiController {
 		}
 
 	}
+	
+	@RequestMapping("/cli/getquery")
+	@ResponseBody
+	String getquery(String sql, String query, HttpServletRequest req, HttpServletResponse resp) throws ParseException {
+		
+	   
+		 
+		
+		return new Response("").toJson();
+	}
 
 	@RequestMapping("/cli/getobjs")
 	@ResponseBody
@@ -372,7 +382,7 @@ public class ApiController {
 
 				Document doc = new Document();
 				if (query.startsWith("{") && query.endsWith("}")) {
-					@SuppressWarnings("unchecked")
+				
 					Map<String, Object> o = (Map<String, Object>) JSON.parse(query);
 					for (String k : o.keySet()) {
 						if (k.equals("_id")) {
@@ -388,11 +398,13 @@ public class ApiController {
 			Object result = queryConverter.run(db);
 			ArrayList<Document> documents = new ArrayList<Document>();
 			if (QueryResultIterator.class.isInstance(result)) {
-				@SuppressWarnings({ "unchecked", "rawtypes", "resource" })
+				
 				QueryResultIterator<Document> iterator = (QueryResultIterator) result;
 				while (iterator.hasNext()) {
 					Document doc = iterator.next();
-					doc.put("_id", doc.getObjectId("_id").toString());
+					if(doc.containsKey("_id")) {
+						doc.put("_id", doc.getObjectId("_id").toString());
+					}
 					documents.add(doc);
 				}
 			}
@@ -406,7 +418,7 @@ public class ApiController {
 			return new Response(map).toJson();
 
 		} catch (Exception e) {
-			return new Response(e.getMessage()).toJson();
+			return new Response("Exception:"+e.getMessage()).toJson();
 		}
 	}
 
@@ -434,6 +446,12 @@ public class ApiController {
 	public static void main(String[] args) throws Exception {
 
 		SpringApplication.run(ApiController.class, args);
+		
+//		QueryConverter queryConverter=new QueryConverter("select borough, cuisine, count(*) from my_collection WHERE borough LIKE 'Queens%' GROUP BY borough, cuisine ORDER BY count(*) DESC;");
+//		
+//		Document query = queryConverter.getMongoQuery().getQuery();
+//		
+//		System.out.println(JSON.serialize(query));
 	}
 
 }
