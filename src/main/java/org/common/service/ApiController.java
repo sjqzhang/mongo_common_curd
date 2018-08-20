@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import com.github.vincentrussell.query.mongodb.sql.converter.ParseException;
 import com.github.vincentrussell.query.mongodb.sql.converter.QueryConverter;
 import com.github.vincentrussell.query.mongodb.sql.converter.QueryResultIterator;
+import com.github.vincentrussell.query.mongodb.sql.converter.SQLCommandType;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
@@ -373,6 +374,9 @@ public class ApiController {
 			}
 			sql = sql.toLowerCase();
 			QueryConverter queryConverter = new QueryConverter(sql);
+			if (queryConverter.getMongoQuery().getSqlCommandType()==SQLCommandType.DELETE) {
+				return new Response("delete was denied","fail").toJson();
+			}
 			long limit = queryConverter.getMongoQuery().getLimit();
 			if (limit < 0) {
 				queryConverter.getMongoQuery().setLimit(LIMIT);
