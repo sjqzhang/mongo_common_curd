@@ -26,6 +26,7 @@ import com.github.vincentrussell.query.mongodb.sql.converter.ParseException;
 import com.github.vincentrussell.query.mongodb.sql.converter.QueryConverter;
 import com.github.vincentrussell.query.mongodb.sql.converter.QueryResultIterator;
 import com.github.vincentrussell.query.mongodb.sql.converter.SQLCommandType;
+import com.mongodb.Block;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
@@ -201,7 +202,7 @@ public class ApiController {
 
 	@RequestMapping("/cli/addobjs")
 	@ResponseBody
-	String addobjs(String table, String key, String data, String is_merge, HttpServletRequest req,
+	String addobjs(String table, String key, String data, String is_merge,String query, HttpServletRequest req,
 			HttpServletResponse resp) throws ParseException {
 
 		logger.info(String.format("ip:%s, table:%s key:%s data:%s is_merge:%s", getClientIp(req), table, key, data,
@@ -226,6 +227,7 @@ public class ApiController {
 				is_merge = "1";
 			}
 			Object obj = null;
+			Map<String,Object> jquery=null;
 			boolean isList = false;
 			obj = getJSON(data);
 			if (obj == null) {
@@ -251,10 +253,56 @@ public class ApiController {
 
 			MongoDatabase db = mongoClient.getDatabase(this.db);
 
-			MongoCollection<Document> collection = db.getCollection(table);
+			final MongoCollection<Document> collection = db.getCollection(table);
 
 			if (message != "") {
 				return new Response(message).toJson();
+			}
+			
+			if(query!=null) {
+				
+				
+				query = query.trim();
+				jquery= (Map<String, Object>) getJSON(query);
+				Document filter = new Document();
+				if (query.startsWith("{") && query.endsWith("}")) {
+				
+					Map<String, Object> o = (Map<String, Object>) JSON.parse(query);
+					for (String k : o.keySet()) {
+						if (k.equals("_id")) {
+							filter.put("_id", new ObjectId(o.get(k).toString()));
+						} else {
+							filter.put(k, o.get(k));
+						}
+					}
+				}
+				
+				
+				final Document obj2=new Document();
+				for (String k : ((Map<String, Object>)obj).keySet()) {
+					obj2.put(k, ((Map<String, Object>)obj).get(k));
+				}
+
+				UpdateResult result = collection.updateMany(filter, new Document("$set", obj2));
+				
+				
+				if(result.getMatchedCount()>0) {
+					return new Response(result.getModifiedCount(),"ok","ok").toJson();
+				} else {
+					return new Response(0,"fail","fail").toJson();
+				}
+				
+		
+//				collection.find(doc).forEach(new Block<Document>() {
+//					public void apply(Document item) {
+//						
+//						if(item.containsKey("_id")) {
+//							collection.updateOne(Filters.eq("_id", item.getObjectId("_id")), obj2);
+//						}
+//					}
+//				});
+				
+				
 			}
 
 			if (key != null && key != "") {
