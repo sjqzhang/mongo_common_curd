@@ -428,7 +428,15 @@ public class ApiController {
 			long limit = queryConverter.getMongoQuery().getLimit();
 			if (limit < 0) {
 				queryConverter.getMongoQuery().setLimit(LIMIT);
+				limit=LIMIT;
 			}
+			
+			if(limit>0 && limit> LIMIT) {
+				limit=LIMIT;
+			}
+			
+			
+			
 			if (query != null && query != "") {
 				query = query.trim();
 
@@ -465,6 +473,7 @@ public class ApiController {
 			Object cnt = queryConverter.run(db);
 			HashMap<String, Object> map = new HashMap<String, Object>();
 			map.put("count", cnt);
+			map.put("limit", limit);
 			map.put("rows", documents);
 			;
 			return new Response(map).toJson();
